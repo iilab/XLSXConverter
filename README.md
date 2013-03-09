@@ -13,3 +13,4 @@ without converting them through a separate application.
 
 The python XLSConverter may still be useful for previewing forms in Chrome, and XLS conversion.
 However, with some work, it should be possible to add these features to the Javascript XLSConverter.
+
