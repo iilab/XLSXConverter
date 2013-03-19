@@ -1,297 +1,55 @@
 <style>
+body {
+    background-color: rgb(247, 235, 223);
+    font-size: 15pt;
+    font-family: "Times New Roman"; 
+}
 #drop{
-	border:2px dashed #bbb;
-	-moz-border-radius:5px;
-	-webkit-border-radius:5px;
+    background-color: white;
+    border:2px dashed #bbb;
+    -moz-border-radius:5px;
+    -webkit-border-radius:5px;
 	border-radius:5px;
 	padding:25px;
 	text-align:center;
-	font:20pt bold,"Vollkorn";color:#bbb
+	font:20pt bold;
+    color:#bbb
 }
 #out{
+    clear: both;
     height: 500px;
     width: 100%;
 }
 #save {
-    margin: 5px;
-    font-size: 1.5em;
+    float: right;
+    font-size: 15pt;
+    margin-top: 15px;
+    font-family: "Times New Roman"; 
+}
+#error {
+    background-color: white;
+    color: red;
+}
+#warnings p {
+    background-color: orange;
 }
 </style>
-<div id="drop">Drop an XLSX file here to convert to ODK Survey JSON.</div>
-<div><center><button onclick="handleSave();" id="save">Save</button></center></div>
+<div id="drop">Drop an XLSX file here to convert to JSON.</div>
+<button onclick="handleSave();" id="save">Save</button>
+<p>Output:</p>
+<div id="error"></div>
+<div id="warnings"></div>
 <textarea id="out"></textarea>
+
 <br />
 
 <script src="js-xlsx/jszip.js"></script>
 <script src="js-xlsx/xlsx.js"></script>
 <script src="js-xls/xls.js"></script>
 <script src="underscore.js"></script>
+<script src="XLSXConverter.js"></script>
 <script>
 
-function processWorkbook(workbook){
-    
-    var promptTypeMap = {
-        "text" : {"type":"string"},
-        "integer" : {"type":"integer"},
-        "decimal" : {"type":"number"},
-        "acknowledge" : {"type":"boolean"},
-        "select_one" : {"type":"string"},
-        "select_multiple": {
-            "type": "array",
-            "isPersisted": true, 
-            "items" : {
-                "type":"string"
-            }
-        },
-        "select_one_with_other" : {"type":"string"},
-        "geopoint" : {
-            "name": "geopoint",
-            "type": "object",
-            "elementType": "geopoint",
-            "properties": {
-                "latitude": {
-                    "type": "number"
-                },
-                "longitude": {
-                    "type": "number"
-                },
-                "altitude": {
-                    "type": "number"
-                },
-                "accuracy": {
-                    "type": "number"
-                }
-            }
-        },
-        "barcode": {"type":"string"},
-        "with_next": {"type":"string"},
-        "goto": null,
-        "label": null,
-        "screen": null,
-        "note": null,
-        "error" : null,
-        "image": {
-            "type": "object",
-            "elementType": "mimeUri",
-            "isPersisted": true,
-            "properties": {
-                "uri": {
-                    "type": "string"
-                },
-                "contentType": {
-                    "type": "string",
-                    "default": "image/*"
-                }
-            }
-        }, 
-        "audio": {
-            "type": "object",
-            "elementType": "mimeUri",
-            "isPersisted": true,
-            "properties": {
-                "uri": {
-                    "type": "string"
-                },
-                "contentType": {
-                    "type": "string",
-                    "default": "audio/*"
-                }
-            }
-        }, 
-        "video": {
-            "type": "object",
-            "elementType": "mimeUri",
-            "isPersisted": true,
-            "properties": {
-                "uri": {
-                    "type": "string"
-                },
-                "contentType": {
-                    "type": "string",
-                    "default": "video/*"
-                }
-            }
-        },
-        "date": {
-            "type": "object",
-            "elementType": "date"
-        }, 
-        "time": {
-            "type": "object",
-            "elementType": "time"
-        }, 
-        "datetime": {
-            "type": "object",
-            "elementType": "dateTime"
-        }
-    };
-    
-    var recursiveExtend = function(obj) {
-        _.each(Array.prototype.slice.call(arguments, 1), function(source) {
-            if (source) {
-                for (var prop in source) {
-                    if (prop in obj) {
-                        if (_.isObject(obj[prop]) && _.isObject(source[prop])) {
-                            obj[prop] = recursiveExtend(obj[prop], source[prop]);
-                        } else {
-                            obj[prop] = [].concat(obj[prop]).concat(source[prop]);
-                        }
-                    } else {
-                        obj[prop] = source[prop];
-                    }
-                }
-            }
-        });
-        return obj;
-    };
-    var listToNestedDict = function(list){
-        var outObj = {};
-        if(list.length > 1){
-            outObj[list[0]] = listToNestedDict(list.slice(1));
-            return outObj;
-        } else {
-            return list[0];
-        }
-    };
-    /*
-    Construct a JSON object from JSON paths in the headers.
-    For now only dot notation is supported.
-    For example:
-    {"text.english": "hello", "text.french" : "bonjour"}
-    becomes
-    {"text": {"english": "hello", "french" : "bonjour"}.
-    */
-    var groupColumnHeaders = function(row) {
-        var outRow = {};
-        _.each(row, function(value, columnHeader){
-            var chComponents = columnHeader.split('.');
-            outRow = recursiveExtend(outRow, listToNestedDict(chComponents.concat(value)));
-        });
-        return outRow;
-    };
-    
-    var generateModel = function(prompts, promptTypeMap){
-        var model = {};
-        
-        _.each(prompts, function(prompt){
-            var schema;
-            if("prompts" in prompt){
-                _.extend(model, generateModel(prompt['prompts'], promptTypeMap));
-            }
-            if(prompt.type in promptTypeMap) {
-                schema = promptTypeMap[prompt.type];
-                if(schema){
-                    if("name" in prompt){
-                        if(prompt.name.match(" ")){
-                            throw "Prompt names can't have spaces.";
-                        }
-                        if(prompt.name in model){
-                            console.log("Duplicate name found");
-                        }
-                        model[prompt.name] = schema;
-                    } else {
-                        throw "Missing required name.";
-                    }
-                }
-            }
-        });
-        return model;
-    };
-    
-    var parsePrompts = function(sheet){
-        var type_regex = /^(\w+)\s*(\S.*)?\s*$/;
-        var outSheet = [];
-        var outArrayStack = [outSheet];
-        _.each(sheet, function(row){
-            var curStack = outArrayStack[outArrayStack.length - 1];
-            var typeParse, typeControl, typeParam;
-            var outRow = row;
-            //Parse the type column:
-            if('type' in outRow) {
-                typeParse = outRow.type.match(type_regex);
-                if(typeParse && typeParse.length > 0) {
-                    typeControl = typeParse[typeParse.length - 2];
-                    typeParam = typeParse[typeParse.length - 1];
-                    if(typeControl === "begin"){
-                        outRow.prompts = [];
-                        outRow.type = typeParam;
-                        //TODO: Param
-                        outArrayStack.push(outRow.prompts);
-                    } else if(typeControl === "end"){
-                        outArrayStack.pop();
-                        return;
-                    } else {
-                        outRow.type = typeControl;
-                        outRow.param = typeParam;
-                    }
-                }
-            }
-            
-            curStack.push(outRow);
-        });
-        if(outArrayStack.length > 1) {
-            throw Error("Unmatched begin statement.");
-        }
-        return outSheet;
-    };
-
-    var removeCarriageReturns = function(row){
-        var outRow = {};
-        _.each(row, function(value, key){
-            if(_.isString(value)){
-                outRow[key] = value.replace(/\r/g, "");
-            } else {
-                 outRow[key] = value;
-            }
-        });
-        return outRow;
-    };
-
-    var wbJson = to_json(workbook);
-    
-    _.each(wbJson, function(sheet, sheetName){
-        _.each(sheet, function(row, rowIdx){
-            sheet[rowIdx] = groupColumnHeaders(removeCarriageReturns(row));
-        });
-    });
-    console.log(wbJson);
-    wbJson['survey'] = parsePrompts(wbJson['survey']);
-    
-    var userDefPrompts;
-    if("prompt_types" in wbJson) {
-        userDefPrompts = _.groupBy(wbJson["prompt_types"], "name");
-        _.each(userDefPrompts, function(value, key){
-            if(_.isArray(value)){
-                userDefPrompts[key] = value[0];
-            }
-        });
-        wbJson["prompt_types"] = _.extend(promptTypeMap, userDefPrompts);
-    }
-
-    var generatedModel = generateModel(wbJson['survey'], promptTypeMap);
-    var userDefModel;
-    if("model" in wbJson){
-        userDefModel = _.groupBy(wbJson["model"], "name");
-        _.each(userDefModel, function(value, key){
-            if(_.isArray(value)){
-                userDefModel[key] = value.schema;
-            }
-        });
-        wbJson['model'] = _.extend(generatedModel, wbJson['model']);
-    } else {
-        wbJson['model'] = generatedModel;
-    }
-    
-    if('choices' in wbJson){
-        wbJson['choices'] = _.groupBy(wbJson['choices'], 'list_name');
-    }
-    
-    return wbJson;
-}
-
-
-//Row object array form:
-//Each row is an object with column headers as keys
 function to_json(workbook) {
 	var result = {};
 	workbook.SheetNames.forEach(function(sheetName) {
@@ -321,41 +79,63 @@ function handleSave(e) {
 }
 
 var drop = document.getElementById('drop');
+//TODO: Test multiple forms
 function handleDrop(e) {
 	e.stopPropagation();
 	e.preventDefault();
 	var files = e.dataTransfer.files;
-	var i,f;
-	for (i = 0, f = files[i]; i != files.length; ++i) {
-		var reader = new FileReader();
-		var name = f.name;
-        
-        reader.onload = function(e) {
-			var data = e.target.result;
-            if(f.name.slice(-3) === "xls"){
-                
-                print_output("Sorry, XLS files are not yet supported.");
-                /*
-    			var cfb = CFB.read(data, {type:'binary'})
-    			window.cfbs[name] = cfb;
-    			//cfb.Paths.forEach(function(x){console.log(x); out.innerText+=x+"\n";});
-    			var wb = parse_xlscfb(cfb);
-    			var ws = wb.Sheets[wb.Directory[0]] 
-    			var csv = make_csv(ws);  
-    			var cmds = get_formulae(ws).join("\n");
-    			out.innerText+=csv+"\n";
-                */
-            } else {
-                var data = e.target.result;
+	var f = files[0];
+
+	var reader = new FileReader();
+	var name = f.name;
+    
+    //Clear the warnings and errors:
+    var errorEl = document.getElementById('error');
+    errorEl.innerText = "";
+    var warnings = document.getElementById('warnings');
+    while (warnings.hasChildNodes()) {
+        warnings.removeChild(warnings.lastChild);
+    }
+
+    reader.onload = function(e) {
+		var data = e.target.result;
+        if(f.name.slice(-3) === "xls"){
+            
+            print_output("Sorry, XLS files are not supported.");
+            /*
+			var cfb = CFB.read(data, {type:'binary'})
+			window.cfbs[name] = cfb;
+			//cfb.Paths.forEach(function(x){console.log(x); out.innerText+=x+"\n";});
+			var wb = parse_xlscfb(cfb);
+			var ws = wb.Sheets[wb.Directory[0]] 
+			var csv = make_csv(ws);  
+			var cmds = get_formulae(ws).join("\n");
+			out.innerText+=csv+"\n";
+            */
+        } else {
+             try {
                 var xlsx = XLSX.read(data, {type: 'binary'});
-                var processedWorkbook = processWorkbook(xlsx);
+                var jsonWorkbook = to_json(xlsx);
+                var processedWorkbook = XLSXConverter.processJSONWorkbook(jsonWorkbook);
                 print_output(JSON.stringify(processedWorkbook, 2, 2));
+                _.each(XLSXConverter.getWarnings(), function(warning){
+                    var warningEl = document.createElement("p");
+                    warningEl.innerText = warning;
+                    console.log(warning);
+                    warnings.appendChild(warningEl);
+                });
+            } catch(e) {
+                errorEl.innerText = String(e);
+                throw e;
             }
-
-		};
-		reader.readAsBinaryString(f);
-
-	}
+        }
+	};
+    try {
+	    reader.readAsBinaryString(f);
+    } catch(e) {
+        errorEl.innerText = "Could not read file.";
+        throw e;
+    }
 }
 
 function handleDragover(e) {

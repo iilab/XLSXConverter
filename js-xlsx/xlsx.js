@@ -102,14 +102,17 @@ function parseSheet(data) { //TODO: use a real xml parser
 	//s.cells = {};
 	var q = ["v","f"];
 	if(!data.match(/<sheetData *\/>/)) 
-	data.match(/<sheetData>(.*)<\/sheetData>/)[1].split("</row>").forEach(function(x) { if(x === "") return;
+	data.match(/<sheetData>(.*)<\/sheetData>/)[1].split("</row>").forEach(function(x) { 
+		if(x === "") return;
 		var row = parsexmltag(x.match(/<row[^>]*>/)[0]); //s.rows[row.r]=row.spans;
 		if(refguess.s.r > row.r - 1) refguess.s.r = row.r - 1; 
 		if(refguess.e.r < row.r - 1) refguess.e.r = row.r - 1;
-		var cells = x.substr(x.indexOf('>')+1).split(/<\/c>|\/>/);
+
+		var cells = x.substr(x.indexOf('>')+1).split(/<c/);
 		cells.forEach(function(c, idx) { if(c === "") return;
-			if(refguess.s.c > idx) refguess.s.c = idx; 
-			if(refguess.e.c < idx) refguess.e.c = idx;
+			c = "<c" + c;
+			if(refguess.s.c > idx - 1) refguess.s.c = idx - 1; 
+			if(refguess.e.c < idx - 1) refguess.e.c = idx - 1;
 			var cell = parsexmltag((c.match(/<c[^>]*>/)||[c])[0]); delete cell[0];
 			var d = c.substr(c.indexOf('>')+1);
 			var p = {};
@@ -121,12 +124,13 @@ function parseSheet(data) { //TODO: use a real xml parser
 				case 'n': p.v = parseFloat(p.v); break;
 				case 's': p.v = strs[parseInt(p.v, 10)].t; break;
 				case 'str': break; // normal string
-                case 'b':
-                    //Parse a boolean.
-                    //I'm not sure how robust this method is.
-                    p.v = Boolean(p.v);
-                    break;
-				default: throw "Unrecognized cell type [" + p.t + "] with value: " + p.v;
+				case 'b':
+					switch(p.v) {
+						case '0': case 'FALSE': case "false": case false: p.v=false; break;
+						case '1': case 'TRUE':  case "true":  case true:  p.v=true;  break;
+						default: throw "Unrecognized boolean: " + p.v;
+					} break;
+				default: throw "Unrecognized cell type: " + p.t;
 			}
 			//s.cells[cell.r] = p;
 			s[cell.r] = p;
@@ -141,12 +145,43 @@ function parseSheet(data) { //TODO: use a real xml parser
 // matches <foo>...</foo> extracts content
 function matchtag(f,g) {return new RegExp('<' + f + '>([\\s\\S]*)</' + f + '>',g||"");}
 
+function parseVector(data) {
+	var h = parsexmltag(data);
+	
+	var matches = data.match(new RegExp("<vt:" + h.baseType + ">(.*?)</vt:" + h.baseType + ">", 'g'));
+	if(matches.length != h.size) throw "unexpected vector length " + matches.length + " != " + h.size;
+	var res = [];
+	matches.forEach(function(x) {
+		var v = x.replace(/<[/]?vt:variant>/g,"").match(/<vt:([^>]*)>(.*)</);
+		res.push({v:v[2], t:v[1]}); 
+	});
+	return res;
+}
+
+
+var utf8read = function(orig) {
+	var out = "", i = 0, c = 0, c1 = 0, c2 = 0, c3 = 0;
+	while (i < orig.length) {
+		c = orig.charCodeAt(i++);
+		if (c < 128) out += _chr(c);
+		else {
+			c2 = orig.charCodeAt(i++);
+			if (c>191 && c<224) out += _chr((c & 31) << 6 | c2 & 63);
+			else {
+				c3 = orig.charCodeAt(i++);
+				out += _chr((c & 15) << 12 | (c2 & 63) << 6 | c3 & 63);
+			}
+		}
+	}
+	return out;
+};
+
 function parseStrs(data) { 
 	var s = [];
 	var sst = data.match(new RegExp("<sst ([^>]*)>([\\s\\S]*)<\/sst>","m"));
 	if(sst) {
 		s = sst[2].replace(/<si>/g,"").split(/<\/si>/).map(function(x) { var z = {};
-			var y=x.match(/<(.*)>([\s\S]*)<\/.*/); if(y) z[y[1]]=unescapexml(y[2]); return z;});
+			var y=x.match(/<(.*)>([\s\S]*)<\/.*/); if(y) z[y[1].split(" ")[0]]=utf8read(unescapexml(y[2])); return z;});
 	
 		sst = parsexmltag(sst[1]); s.count = sst.count; s.uniqueCount = sst.uniqueCount;
 	}
@@ -167,8 +202,19 @@ function parseProps(data) {
 		if(cur && cur.length > 0) q[f] = cur[1];
 	});
 
-	if(q["HeadingPairs"]) p["Worksheets"] = parseInt(q["HeadingPairs"].match(new RegExp("<vt:i4>(.*)<\/vt:i4>"))[1], 10); 
-	if(q["TitlesOfParts"]) p["SheetNames"] = q["TitlesOfParts"].match(new RegExp("<vt:lpstr>([^<]*)<\/vt:lpstr>","g")).map(function(x){return x.match(new RegExp("<vt:lpstr>([^<]*)<\/vt:lpstr>"))[1];});
+	if(q["HeadingPairs"] && q["TitlesOfParts"]) {
+		var v = parseVector(q["HeadingPairs"]);
+		var j = 0, widx = 0;
+		for(var i = 0; i !== v.length; ++i) {
+			switch(v[i].v) {
+				case "Worksheets": widx = j; p["Worksheets"] = +v[++i]; break;
+				case "Named Ranges": ++i; break; // TODO: Handle Named Ranges
+				default: console.error("Unrecognized key in Heading Pairs: " + v[i++].v);
+			}
+		}
+		var parts = parseVector(q["TitlesOfParts"]).map(utf8read);
+		p["SheetNames"] = parts.slice(widx, widx + p["Worksheets"]);
+	}
 	p["Creator"] = q["dc:creator"];
 	p["LastModifiedBy"] = q["cp:lastModifiedBy"];
 	p["CreatedDate"] = new Date(q["dcterms:created"]);
@@ -234,18 +280,20 @@ function parseWB(data) {
 			case '<bookViews>': case '</bookViews>': break; // aggregate workbookView
 			case '<workbookView': delete y[0]; wb.WBView.push(y); break;
 			case '<sheets>': case '</sheets>': break; // aggregate sheet
-			case '<sheet': delete y[0]; wb.Sheets.push(y); break; 
+			case '<sheet': delete y[0]; y.name = utf8read(y.name); wb.Sheets.push(y); break; 
 			case '</extLst>': case '</workbook>': break;
 			case '<workbookProtection/>': break; // LibreOffice 
 			case '<extLst>': break; 
 			case '<calcPr': delete y[0]; wb.CalcPr = y; break;
 			case '<calcPr/>': delete y[0]; wb.CalcPr = y; break;
 			
-			case '<definedNames/>': break;
 			case '<mx:ArchID': break;
 			case '<ext': pass=true; break; //TODO: check with versions of excel
 			case '</ext>': pass=false; break; 
 			
+			case '<definedNames/>': break;
+			case '<definedNames>': pass=true; break;
+			case '</definedNames>': pass=false; break;
 			/* Introduced for Excel2013 Baseline */
 			case '<mc:AlternateContent': pass=true; break; // TODO: do something 
 			case '</mc:AlternateContent>': pass=false; break; // TODO: do something
@@ -274,19 +322,24 @@ function parseZip(zip) {
 	var deps = {};
 	if(dir.calcchain) deps=parseDeps(zip.files[dir.calcchain.replace(/^\//,'')].data);
 	if(dir.strs[0]) strs=parseStrs(zip.files[dir.strs[0].replace(/^\//,'')].data);
-	var sheets = {};
+	var sheets = {}, i=0;
 	if(!props.Worksheets) {
+		/* Google Docs doesn't generate the appropriate metadata, so we impute: */
 		var wbsheets = wb.Sheets;
 		props.Worksheets = wbsheets.length;
 		props.SheetNames = [];
 		for(var j = 0; j != wbsheets.length; ++j) {
 			props.SheetNames[j] = wbsheets[j].name;
 		}
+		for(i = 0; i != props.Worksheets; ++i) {
+			sheets[props.SheetNames[i]]=parseSheet(zip.files['xl/worksheets/sheet' + (i+1) + '.xml'].data);
+		}
 	}
-	for(var i = 0; i != props.Worksheets; ++i) {
-		sheets[props.SheetNames[i]]=parseSheet(zip.files[dir.sheets[i].replace(/^\//,'')].data);
+	else {
+		for(i = 0; i != props.Worksheets; ++i) {
+			sheets[props.SheetNames[i]]=parseSheet(zip.files[dir.sheets[i].replace(/^\//,'')].data);
+		}
 	}
-
 	return {
 		Directory: dir,
 		Workbook: wb,
@@ -331,7 +384,9 @@ return this;
 
 })();
 
-function encode_col(col) { var s=""; for(++col; col; col=Math.floor((col-1)/26)) s = String.fromCharCode(((col-1)%26) + 65) + s; return s; }
+var _chr = function(c) { return String.fromCharCode(c); };
+
+function encode_col(col) { var s=""; for(++col; col; col=Math.floor((col-1)/26)) s = _chr(((col-1)%26) + 65) + s; return s; }
 function encode_row(row) { return "" + (row + 1); }
 function encode_cell(cell) { return encode_col(cell.c) + encode_row(cell.r); }
 
@@ -357,8 +412,9 @@ function sheet_to_row_object_array(sheet){
 				r: range.s.r
 			})];
 			if(val){
-				if(val.t === "s"){
-					columnHeaders[C] = val.v;
+				switch(val.t) {
+					case 's': case 'str': columnHeaders[C] = val.v; break;
+					case 'n': columnHeaders[C] = val.v; break;
 				}
 			}
 		}
@@ -396,6 +452,7 @@ function sheet_to_csv(sheet) {
 		switch(val.t){
 			case 'n': return val.v;
 			case 's': case 'str': return JSON.stringify(val.v);
+			case 'b': return val.v ? "TRUE" : "FALSE";
 			default: throw 'unrecognized type ' + val.t;
 		}
 	};
