@@ -116,6 +116,7 @@ function handleDrop(e) {
              try {
                 var xlsx = XLSX.read(data, {type: 'binary'});
                 var jsonWorkbook = to_json(xlsx);
+                //console.log(jsonWorkbook);
                 var processedWorkbook = XLSXConverter.processJSONWorkbook(jsonWorkbook);
                 print_output(JSON.stringify(processedWorkbook, 2, 2));
                 _.each(XLSXConverter.getWarnings(), function(warning){

@@ -220,9 +220,9 @@ window.XLSXConverter = (function(_){
                         //Second type parse is probably not needed, it's just
                         //there incase begin ____ statements ever need a parameter
                         var secondTypeParse = outRow.type.match(type_regex);
-                        if(secondTypeParse && secondTypeParse.length > 1) {
-                            outRow.type = secondTypeParse[0];
-                            outRow.param = secondTypeParse[1];
+                        if(secondTypeParse && secondTypeParse.length > 2) {
+                            outRow.type = secondTypeParse[1];
+                            outRow.param = secondTypeParse[2];
                         }
                         outArrayStack.push(outRow);
                     } else if(typeControl === "end"){
