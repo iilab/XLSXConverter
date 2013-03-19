@@ -2,7 +2,7 @@ XLSXConverter
 -------------
 
 This is a webpage that converts XLSX files into json form defintions for ODK Survey.
-It is avaialbe online [here](http://uw-ictd.github.com/XLSConverter.js/) via this repo's gh-pages branch.
+It is avaialbe online [here](http://uw-ictd.github.com/XLSXConverter/) via this repo's gh-pages branch.
 
 These are some potential uses for it:
 
