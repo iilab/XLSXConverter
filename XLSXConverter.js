@@ -120,17 +120,28 @@ window.XLSXConverter = (function(_){
     };
     /*
     Extend the given object with any number of additional objects.
-    If the objects have child objects with matching keys, they will
-    extend eachother rather than being overwritten.
+    If the objects have matching keys, the values of those keys will be
+    recursively merged, either by extending eachother if any are objects,
+    or by being combined into an array if none are objects.
     */
     var recursiveExtend = function(obj) {
         _.each(Array.prototype.slice.call(arguments, 1), function(source) {
             if (source) {
                 for (var prop in source) {
                     if (prop in obj) {
-                        if (_.isObject(obj[prop]) && _.isObject(source[prop])) {
+                        if (_.isObject(obj[prop]) || _.isObject(source[prop])) {
+                            //If one of the values is not an object,
+                            //put it in an object under the key "default"
+                            //so it can be merged.
+                            if(!_.isObject(obj[prop])){
+                                obj[prop] = {"default" : obj[prop] };
+                            }
+                            if(!_.isObject(source[prop])){
+                                source[prop] = {"default" : source[prop] };
+                            }
                             obj[prop] = recursiveExtend(obj[prop], source[prop]);
                         } else {
+                            //If neither value is an object put them in an array.
                             obj[prop] = [].concat(obj[prop]).concat(source[prop]);
                         }
                     } else {
@@ -236,6 +247,9 @@ window.XLSXConverter = (function(_){
                         outRow.param = typeParam;
                     }
                 }
+            } else {
+                //Skip rows without types
+                return;
             }
             curStack.push(outRow);
         });
@@ -245,39 +259,72 @@ window.XLSXConverter = (function(_){
         return outSheet;
     };
     
-    var removeCarriageReturns = function(row){
+    //Remove carriage returns, trim values.
+    var cleanValues = function(row){
         var outRow = Object.create(row.__proto__);
         _.each(row, function(value, key){
             if(_.isString(value)){
-                outRow[key] = value.replace(/\r/g, "");
-            } else {
-                 outRow[key] = value;
+                value = value.replace(/\r/g, "");
+                value = value.trim();
             }
+            outRow[key] = value;
         });
         return outRow;
     };
+    
     return {
         processJSONWorkbook : function(wbJson){
             warnings.clear();
             _.each(wbJson, function(sheet, sheetName){
                 _.each(sheet, function(row, rowIdx){
-                    sheet[rowIdx] = groupColumnHeaders(removeCarriageReturns(row));
+                    sheet[rowIdx] = groupColumnHeaders(cleanValues(row));
                 });
             });
+            
+            //Process sheet names by converting from json paths to nested objects.
+            var tempWb = {};
+            _.each(wbJson, function(sheet, sheetName){
+                var tokens = sheetName.split('.');console.log(tokens)
+                var sheetObj = {};
+                sheetObj[tokens[0]] = listToNestedDict(tokens.slice(1).concat([sheet]));
+                console.log(sheetObj)
+                recursiveExtend(tempWb, sheetObj);
+            });
+            wbJson = tempWb;
+            console.log(wbJson)
+            
+            if(!('survey' in wbJson)){
+                throw Error("Missing survey sheet");
+            }
+            
+            if(_.isObject(wbJson['survey'])){
+                //If the survey sheet is an object rather than an array,
+                //We have multiple sheets of the form survey.x survey.y ... 
+                //So we concatenate them into an alphabetically sorted array.
+                wbJson['survey'] = _.flatten(_.sortBy(wbJson['survey'],
+                function(val, key) {
+                    return key;
+                }), true);
+            }
+            
             wbJson['survey'] = parsePrompts(wbJson['survey']);
             
-            var userDefPrompts;
+            if('choices' in wbJson){
+                wbJson['choices'] = _.groupBy(wbJson['choices'], 'list_name');
+            }
+            
+            //Generate a model:
+            var userDefPrompts = {};
             if("prompt_types" in wbJson) {
                 userDefPrompts = _.groupBy(wbJson["prompt_types"], "name");
                 _.each(userDefPrompts, function(value, key){
                     if(_.isArray(value)){
-                        userDefPrompts[key] = value[0];
+                        userDefPrompts[key] = value[0].schema;
                     }
                 });
-                wbJson["prompt_types"] = _.extend(promptTypeMap, userDefPrompts);
             }
-        
-            var generatedModel = generateModel(wbJson['survey'], promptTypeMap);
+            var extendedPTM = _.extend({}, promptTypeMap, userDefPrompts);
+            var generatedModel = generateModel(wbJson['survey'], extendedPTM);
             var userDefModel;
             if("model" in wbJson){
                 userDefModel = _.groupBy(wbJson["model"], "name");
@@ -289,10 +336,6 @@ window.XLSXConverter = (function(_){
                 wbJson['model'] = _.extend(generatedModel, wbJson['model']);
             } else {
                 wbJson['model'] = generatedModel;
-            }
-            
-            if('choices' in wbJson){
-                wbJson['choices'] = _.groupBy(wbJson['choices'], 'list_name');
             }
             
             return wbJson;
