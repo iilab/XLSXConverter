@@ -97,10 +97,10 @@ function to_json(workbook) {
 
 function print_output(output) {
     var out = document.getElementById("out");
-    if(out.innerText === undefined){
+    if(out.innerHTML === undefined){
         out.textContent = output;
     } else {
-        out.innerText = output;
+        out.innerHTML = output;
     }
 }
 
@@ -135,18 +135,20 @@ function handleDrop(e) {
 
     reader.onload = function(e) {
 		var data = e.target.result;
+        var errorEl = document.createElement("p");
         if(f.name.slice(-3) === "xls"){
-            
-            print_output("Sorry, XLS files are not supported.");
+            errorEl.innerHTML = "Sorry, XLS files are not supported.<br />";
+            errorEl.innerHTML += "You can convert your XLS file to XLSX using libreOffice or Google Docs.";
+            errorsEl.appendChild(errorEl);
             /*
 			var cfb = CFB.read(data, {type:'binary'})
 			window.cfbs[name] = cfb;
-			//cfb.Paths.forEach(function(x){console.log(x); out.innerText+=x+"\n";});
+			//cfb.Paths.forEach(function(x){console.log(x); out.innerHTML+=x+"\n";});
 			var wb = parse_xlscfb(cfb);
 			var ws = wb.Sheets[wb.Directory[0]] 
 			var csv = make_csv(ws);  
 			var cmds = get_formulae(ws).join("\n");
-			out.innerText+=csv+"\n";
+			out.innerHTML+=csv+"\n";
             */
         } else {
              try {
@@ -157,13 +159,12 @@ function handleDrop(e) {
                 print_output(JSON.stringify(processedWorkbook, 2, 2));
                 _.each(XLSXConverter.getWarnings(), function(warning){
                     var warningEl = document.createElement("p");
-                    warningEl.innerText = warning;
+                    warningEl.innerHTML = warning;
                     console.log(warning);
                     warnings.appendChild(warningEl);
                 });
             } catch(e) {
-                var errorEl = document.createElement("p");
-                errorEl.innerText = String(e);
+                errorEl.innerHTML = String(e);
                 errorsEl.appendChild(errorEl);
                 throw e;
             }
@@ -172,7 +173,7 @@ function handleDrop(e) {
     try {
 	    reader.readAsBinaryString(f);
     } catch(e) {
-        errorEl.innerText = "Could not read file.";
+        errorEl.innerHTML = "Could not read file.";
         throw e;
     }
 }
