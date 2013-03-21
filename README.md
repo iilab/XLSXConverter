@@ -25,7 +25,19 @@ provides a Litmus test of whether a bug is occuring in XLSXConverter or js-xlsx.
 Google appscript support:
 -------------------------
 
-The `wrapper.gs` file can be used in conjunction with `XLSConverter.js` and `underscore.js`
+The `wrapper.gs` file can be used in conjunction with `underscore.js` and `XLSXConverter.js`
 to create a script available inside google spreadsheets for doing conversions.
+There is an example of this available [here](https://docs.google.com/spreadsheet/ccc?key=0Ak1svGcuI9iqdDRlbGdBbndBTm9VeVdjOURBdDNORnc&usp=sharing).
+All the scripts need to be renamed to have the `.gs` extension,
+and there seem to be some issues with managing script dependencies in google appscript.
+For me, importing the scripts in the following order seems to work: 
+
+1. wrapper
+2. underscore
+3. XLSXConverter
+
+Other options include putting all the scripts into a single file,
+and messing around with the experimental "Manage Libraries" feature.
+
 If ODK Survey were extended with the ability to fetch documents from google docs,
 it would be possible to add a preview link.
