@@ -28,4 +28,4 @@ Google appscript support:
 The `wrapper.gs` file can be used in conjunction with `XLSConverter.js` and `underscore.js`
 to create a script available inside google spreadsheets for doing conversions.
 If ODK Survey were extended with the ability to fetch documents from google docs,
-it would be possible it would be possible to add previewing.
+it would be possible to add a preview link.
