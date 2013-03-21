@@ -29,8 +29,8 @@ The `wrapper.gs` file can be used in conjunction with `underscore.js` and `XLSXC
 to create a script available inside google spreadsheets for doing conversions.
 There is an example of this available [here](https://docs.google.com/spreadsheet/ccc?key=0Ak1svGcuI9iqdDRlbGdBbndBTm9VeVdjOURBdDNORnc&usp=sharing).
 All the scripts need to be renamed to have the `.gs` extension,
-and there seem to be some issues with managing script dependencies in google appscript.
-For me, importing the scripts in the following order seems to work: 
+and google appscript doesn't seem to have a clear way of managing script dependencies,
+so it is necessairy to import the scripts in the following order: 
 
 1. wrapper
 2. underscore
