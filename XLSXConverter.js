@@ -1,4 +1,9 @@
-window.XLSXConverter = (function(_){
+(function(){
+    
+    // Establish the root object, `window` in the browser, or `global` on the server.
+    var root = this;
+    
+    var _ = root._;
     
     //The propt type map is not kept in a separate JSON file because
     //origin policies might prevent it from being fetched when this script
@@ -173,7 +178,7 @@ window.XLSXConverter = (function(_){
     {"text": {"english": "hello", "french" : "bonjour"}.
     */
     var groupColumnHeaders = function(row) {
-        var outRow = Object.create(row.__proto__);
+        var outRow = Object.create(row.__proto__ || row.prototype);
         _.each(row, function(value, columnHeader){
             var chComponents = columnHeader.split('.');
             outRow = recursiveExtend(outRow, listToNestedDict(chComponents.concat(value)));
@@ -261,7 +266,7 @@ window.XLSXConverter = (function(_){
     
     //Remove carriage returns, trim values.
     var cleanValues = function(row){
-        var outRow = Object.create(row.__proto__);
+        var outRow = Object.create(row.__proto__ || row.prototype);
         _.each(row, function(value, key){
             if(_.isString(value)){
                 value = value.replace(/\r/g, "");
@@ -272,7 +277,7 @@ window.XLSXConverter = (function(_){
         return outRow;
     };
     
-    return {
+    root.XLSXConverter = {
         processJSONWorkbook : function(wbJson){
             warnings.clear();
             _.each(wbJson, function(sheet, sheetName){
@@ -284,14 +289,12 @@ window.XLSXConverter = (function(_){
             //Process sheet names by converting from json paths to nested objects.
             var tempWb = {};
             _.each(wbJson, function(sheet, sheetName){
-                var tokens = sheetName.split('.');console.log(tokens)
+                var tokens = sheetName.split('.');
                 var sheetObj = {};
                 sheetObj[tokens[0]] = listToNestedDict(tokens.slice(1).concat([sheet]));
-                console.log(sheetObj)
                 recursiveExtend(tempWb, sheetObj);
             });
             wbJson = tempWb;
-            console.log(wbJson)
             
             if(!('survey' in wbJson)){
                 throw Error("Missing survey sheet");
@@ -345,4 +348,4 @@ window.XLSXConverter = (function(_){
             return warnings.toArray();
         }
     };
-})(_);
+}).call(this);

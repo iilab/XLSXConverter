@@ -21,3 +21,11 @@ and I have encountered a few bugs in it. However, it is very well supported,
 all the bugs I've reported have been fixed in about a day.
 [The js-xlsx demo page](http://niggler.github.com/js-xlsx/)
 provides a Litmus test of whether a bug is occuring in XLSXConverter or js-xlsx.
+
+Google appscript support:
+-------------------------
+
+The `wrapper.gs` file can be used in conjunction with `XLSConverter.js` and `underscore.js`
+to create a script available inside google spreadsheets for doing conversions.
+If ODK Survey were extended with the ability to fetch documents from google docs,
+it would be possible it would be possible to add previewing.
