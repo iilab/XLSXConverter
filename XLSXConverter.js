@@ -282,7 +282,9 @@
             warnings.clear();
             _.each(wbJson, function(sheet, sheetName){
                 _.each(sheet, function(row, rowIdx){
-                    sheet[rowIdx] = groupColumnHeaders(cleanValues(row));
+                    var reRow = groupColumnHeaders(cleanValues(row));
+                    reRow._rowNum = reRow.__rowNum__ + 1;
+                    sheet[rowIdx] = reRow;
                 });
             });
             
@@ -333,10 +335,10 @@
                 userDefModel = _.groupBy(wbJson["model"], "name");
                 _.each(userDefModel, function(value, key){
                     if(_.isArray(value)){
-                        userDefModel[key] = value.schema;
+                        userDefModel[key] = value[0].schema;
                     }
                 });
-                wbJson['model'] = _.extend(generatedModel, wbJson['model']);
+                wbJson['model'] = _.extend(generatedModel, userDefModel);
             } else {
                 wbJson['model'] = generatedModel;
             }
