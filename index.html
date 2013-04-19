@@ -158,7 +158,7 @@ function handleDrop(e) {
                 //console.log(jsonWorkbook);
                 var processedWorkbook = XLSXConverter.processJSONWorkbook(jsonWorkbook);
                 var jsonString = JSON.stringify(processedWorkbook, 2, 2);
-                print_output(jsonString));
+                print_output(jsonString);
                 var saveBtn = document.getElementById('save');
                 saveBtn.href = window.URL.createObjectURL(new Blob([jsonString], { type: "text/plain" }));
 		saveBtn.download = "formDef.json";
