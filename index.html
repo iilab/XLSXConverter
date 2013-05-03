@@ -125,8 +125,7 @@ function handleDrop(e) {
 		var data = e.target.result;
         var $errorEl = $("<p>");
         if(f.name.slice(-3) === "xls"){
-            $errorEl.text("Sorry, XLS files are not supported.<br />");
-            $errorEl.text("You can convert your XLS file to XLSX using libreOffice or Google Docs.");
+            $errorEl.text("Sorry, XLS files are not supported.\nYou can convert your XLS file to XLSX using libreOffice or Google Docs.");
             $("#errors").append($errorEl);
             /*
 			var cfb = CFB.read(data, {type:'binary'})
@@ -152,7 +151,7 @@ function handleDrop(e) {
                 _.each(XLSXConverter.getWarnings(), function(warning){
                     var $warningEl = $("<p>");
                     $warningEl.text(warning);
-                    $("#warnings").append(warningEl);
+                    $("#warnings").append($warningEl);
                 });
             } catch(e) {
                 $errorEl.text(String(e));
