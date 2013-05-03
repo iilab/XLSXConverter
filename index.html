@@ -64,6 +64,7 @@ body {
 <script src="js-xlsx/xlsx.js"></script>
 <script src="underscore.js"></script>
 <script src="XLSXConverter.js"></script>
+<script src="jquery-1.9.1.min.js"></script>
 <script>
 
 function removeEmptyStrings(rObjArr){
@@ -95,14 +96,6 @@ function to_json(workbook) {
 	return result;
 }
 
-function print_output(output) {
-    var out = document.getElementById("out");
-    if(out.innerHTML === undefined){
-        out.textContent = output;
-    } else {
-        out.innerHTML = output;
-    }
-}
 /*
 function handleSave(e) {
     var uriContent = "data:application/octet-stream," + encodeURIComponent(document.getElementById("out").value);
@@ -125,22 +118,16 @@ function handleDrop(e) {
 	var name = f.name;
     
     //Clear the warnings and errors:
-    var errorsEl = document.getElementById('errors');
-    while (errorsEl.hasChildNodes()) {
-        errorsEl.removeChild(errorsEl.lastChild);
-    }
-    var warnings = document.getElementById('warnings');
-    while (warnings.hasChildNodes()) {
-        warnings.removeChild(warnings.lastChild);
-    }
+    $("#errors").empty();
+    $("#warnings").empty();
 
     reader.onload = function(e) {
 		var data = e.target.result;
-        var errorEl = document.createElement("p");
+        var $errorEl = $("<p>");
         if(f.name.slice(-3) === "xls"){
-            errorEl.innerHTML = "Sorry, XLS files are not supported.<br />";
-            errorEl.innerHTML += "You can convert your XLS file to XLSX using libreOffice or Google Docs.";
-            errorsEl.appendChild(errorEl);
+            $errorEl.text("Sorry, XLS files are not supported.<br />");
+            $errorEl.text("You can convert your XLS file to XLSX using libreOffice or Google Docs.");
+            $("#errors").append($errorEl);
             /*
 			var cfb = CFB.read(data, {type:'binary'})
 			window.cfbs[name] = cfb;
@@ -158,19 +145,18 @@ function handleDrop(e) {
                 //console.log(jsonWorkbook);
                 var processedWorkbook = XLSXConverter.processJSONWorkbook(jsonWorkbook);
                 var jsonString = JSON.stringify(processedWorkbook, 2, 2);
-                print_output(jsonString);
-                var saveBtn = document.getElementById('save');
-                saveBtn.href = window.URL.createObjectURL(new Blob([jsonString], { type: "text/plain" }));
-		saveBtn.download = "formDef.json";
+                $("#out").text(jsonString);
+                var $saveBtn = $('#save');
+                $saveBtn.attr('href', window.URL.createObjectURL(new Blob([jsonString], { type: "text/plain" })));
+                $saveBtn.attr('download', "formDef.json");
                 _.each(XLSXConverter.getWarnings(), function(warning){
-                    var warningEl = document.createElement("p");
-                    warningEl.innerHTML = warning;
-                    console.log(warning);
-                    warnings.appendChild(warningEl);
+                    var $warningEl = $("<p>");
+                    $warningEl.text(warning);
+                    $("#warnings").append(warningEl);
                 });
             } catch(e) {
-                errorEl.innerHTML = String(e);
-                errorsEl.appendChild(errorEl);
+                $errorEl.text(String(e));
+                $("#errors").append($errorEl);
                 throw e;
             }
         }
@@ -178,7 +164,7 @@ function handleDrop(e) {
     try {
 	    reader.readAsBinaryString(f);
     } catch(e) {
-        errorEl.innerHTML = "Could not read file.";
+        $("#errors").append("<p>Could not read file.</p>");
         throw e;
     }
 }
