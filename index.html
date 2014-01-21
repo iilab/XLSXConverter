@@ -140,9 +140,13 @@ function handleDrop(e) {
         } else {
              try {
                 var xlsx = XLSX.read(data, {type: 'binary'});
+                // Converts workbook to JSON
                 var jsonWorkbook = to_json(xlsx);
                 //console.log(jsonWorkbook);
+                // Converts JSON to custom format (see XLSXConverter.js)
+                // This is the meat of it.
                 var processedWorkbook = XLSXConverter.processJSONWorkbook(jsonWorkbook);
+                //console.log(processedWorkbook);
                 var jsonString = JSON.stringify(processedWorkbook, 2, 2);
                 $("#out").text(jsonString);
                 var $saveBtn = $('#save');

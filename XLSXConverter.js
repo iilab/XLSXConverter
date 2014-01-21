@@ -127,22 +127,26 @@
             outRow = recursiveExtend(outRow, listToNestedDict(chComponents.concat(value)));
         });
         return outRow;
+
     };
     /*
     Generates a model for ODK Survey.
     */
-    var generateModel = function(prompts, promptTypeMap) {
+    // modified to allow for root object in 'prompt' instead of a method. - huslage
+    var generateModel = function(properties, promptTypeMap) {
         var model = {};
-
-        _.each(prompts, function(prompt) {
+        _.each(properties, function(prompt) {
+            //console.log(prompt);
             var schema;
-            if ("field_id" in prompt) {
-                _.extend(model, generateModel(prompt['field_id'], promptTypeMap));
+            if (prompt.id) {
+                // implements the typeMap at the top of the file. Adds "type" method to object.
+                _.extend(model, generateModel(prompt.id, promptTypeMap));
+                //console.log(model);
             }
             if (prompt.type in promptTypeMap) {
                 schema = promptTypeMap[prompt.type];
                 if (schema) {
-                    if ("field_id" in prompt) {
+                    if (prompt.id) {
                         if (prompt.name.match(" ")) {
                             throw XLSXError(prompt.__rowNum__, "Prompt names can't have spaces.");
                         }
@@ -156,17 +160,19 @@
                 }
             }
         });
+
         return model;
     };
 
+    // Generates the structure from 'type' field.
     var parsePrompts = function(sheet) {
         var type_regex = /^(\w+)\s*(\S.*)?\s*$/;
         var outSheet = [];
         var outArrayStack = [{
-            prompts: outSheet
+            properties: outSheet
         }];
         _.each(sheet, function(row) {
-            var curStack = outArrayStack[outArrayStack.length - 1].prompts;
+            var curStack = outArrayStack[outArrayStack.length - 1].properties;
             var typeParse, typeControl, typeParam;
             var outRow = row;
             //Parse the type column:
@@ -176,7 +182,7 @@
                     typeControl = typeParse[typeParse.length - 2];
                     typeParam = typeParse[typeParse.length - 1];
                     if (typeControl === "begin_form") {
-                        outRow.prompts = [];
+                        outRow.properties = [];
                         outRow.type = typeParam;
                         //Second type parse is probably not needed, it's just
                         //there incase begin ____ statements ever need a parameter
@@ -202,6 +208,8 @@
                 return;
             }
             curStack.push(outRow);
+            console.log(outRow);
+
         });
         if (outArrayStack.length > 1) {
             throw XLSXError(outArrayStack.pop().__rowNum__, "Unmatched begin statement.");
@@ -234,6 +242,7 @@
             });
 
             //Process sheet names by converting from json paths to nested objects.
+            //Sheet names become objects containing the rows in the sheet.
             var tempWb = {};
             _.each(wbJson, function(sheet, sheetName) {
                 var tokens = sheetName.split('.');
@@ -260,33 +269,36 @@
             wbJson['survey'] = parsePrompts(wbJson['survey']);
 
             if ('choices' in wbJson) {
+                // lists is the sheet name. list_id is the column name on that sheet
                 wbJson['lists'] = _.groupBy(wbJson['lists'], 'list_id');
             }
 
             //Generate a model:
             var userDefPrompts = {};
-            if ("prompt_types" in wbJson) {
-                userDefPrompts = _.groupBy(wbJson["prompt_types"], "name");
-                _.each(userDefPrompts, function(value, key) {
-                    if (_.isArray(value)) {
-                        userDefPrompts[key] = value[0].schema;
-                    }
-                });
-            }
+            // if ("prompt_types" in wbJson) {
+            //     userDefPrompts = _.groupBy(wbJson["prompt_types"], "name");
+            //     _.each(userDefPrompts, function(value, key) {
+            //         if (_.isArray(value)) {
+            //             userDefPrompts[key] = value[0].schema;
+            //         }
+            //     });
+            // }
             var extendedPTM = _.extend({}, promptTypeMap, userDefPrompts);
+
+            // Converts the 'survey' sheet into custom format 
             var generatedModel = generateModel(wbJson['survey'], extendedPTM);
-            var userDefModel;
-            if ("model" in wbJson) {
-                userDefModel = _.groupBy(wbJson["model"], "name");
-                _.each(userDefModel, function(value, key) {
-                    if (_.isArray(value)) {
-                        userDefModel[key] = value[0].schema;
-                    }
-                });
-                wbJson['model'] = _.extend(generatedModel, userDefModel);
-            } else {
-                wbJson['model'] = generatedModel;
-            }
+            // var userDefModel;
+            // if ("model" in wbJson) {
+            //     userDefModel = _.groupBy(wbJson["model"], "name");
+            //     _.each(userDefModel, function(value, key) {
+            //         if (_.isArray(value)) {
+            //             userDefModel[key] = value[0].schema;
+            //         }
+            //     });
+            //     wbJson['model'] = _.extend(generatedModel, userDefModel);
+            // } else {
+            wbJson['model'] = generatedModel;
+            // }
 
             return wbJson;
         },
