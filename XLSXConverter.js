@@ -29,7 +29,7 @@
             "type": "string",
         },
         "drop_down": {
-            "type": "string"
+            "type": "select"
         },
         "check_boxes": {
             "type": "string"
@@ -130,90 +130,97 @@
 
     };
     /*
-    Generates a model for ODK Survey.
+    Generates a model for Alpaca.
     */
-    // modified to allow for root object in 'prompt' instead of a method. - huslage
-    var generateModel = function(properties, promptTypeMap) {
-        var model = {};
-        _.each(properties, function(prompt) {
-            //console.log(prompt);
-            var schema;
-            if (prompt.id) {
-                // implements the typeMap at the top of the file. Adds "type" method to object.
-                _.extend(model, generateModel(prompt.id, promptTypeMap));
-                //console.log(model);
-            }
-            if (prompt.type in promptTypeMap) {
-                schema = promptTypeMap[prompt.type];
-                if (schema) {
-                    if (prompt.id) {
-                        if (prompt.name.match(" ")) {
-                            throw XLSXError(prompt.__rowNum__, "Prompt names can't have spaces.");
+    var generateAlpaca = function(formList, promptTypeMap) {
+        var models = [];
+        _.each(formList, function(form){
+            //create a schema and options object for this form
+            var schema = {};
+            var options = {};
+
+            var beginRow = form.shift();
+            //make sure that there is a begin_form marker at the top
+            if(beginRow.type == "begin_form"){
+                //establish the schema basic items
+                schema.title = beginRow.en_labels;
+                schema._id = beginRow.id;
+                schema.type = "object";
+                schema.properties = {};
+
+                //establish options basic items
+                options.fields = {};
+
+                if(beginRow.en_help){
+                    schema.description = beginRow.en_help;
+                }
+                for(var i=0;i<form.length;i++){
+                    //grab single form item in form
+                    var formItem = form[i];
+                    var itemType = promptTypeMap[formItem.type];
+                    //create a schema and options object to match it
+                    var schemaObj = {};
+                    var optionsObj = {};
+                    //make sure the formItem has an id and legit type
+                    if(formItem.id != undefined && itemType != undefined){
+
+                        optionsObj.label = formItem.en_labels
+                        optionsObj.helper = formItem.sw_labels;
+                        schemaObj.type = "string";
+                        if(formItem.constraint != undefined){
+                            switch(formItem.constraint){
+                                case "required":
+                                    schemaObj.required = true;
+                                    break;
+                            }
                         }
-                        if (prompt.name in model) {
-                            warnings.warn(prompt.__rowNum__, "Duplicate name found");
+                        if(itemType.type != "string"){
+                            // optionsObj.type = itemType.type;
                         }
-                        model[prompt.name] = schema;
-                    } else {
-                        throw XLSXError(prompt.__rowNum__, "Missing name.");
+
+                        //add form items to schema and options
+                        schema.properties[formItem.id] = schemaObj;
+                        options.fields[formItem.id] = optionsObj
+
                     }
                 }
             }
+            var model = {"schema": schema, "options": options};
+            console.log(JSON.stringify(model));
+            models.push(model);
         });
-
-        return model;
+        return models;
     };
 
-    // Generates the structure from 'type' field.
-    var parsePrompts = function(sheet) {
+    // Cut the xlsx file into separate forms.
+    var parseForms = function(sheet) {
         var type_regex = /^(\w+)\s*(\S.*)?\s*$/;
         var outSheet = [];
-        var outArrayStack = [{
-            properties: outSheet
-        }];
-        _.each(sheet, function(row) {
-            var curStack = outArrayStack[outArrayStack.length - 1].properties;
-            var typeParse, typeControl, typeParam;
-            var outRow = row;
-            //Parse the type column:
-            if ('type' in outRow) {
-                typeParse = outRow.type.match(type_regex);
-                if (typeParse && typeParse.length > 0) {
-                    typeControl = typeParse[typeParse.length - 2];
-                    typeParam = typeParse[typeParse.length - 1];
-                    if (typeControl === "begin_form") {
-                        outRow.properties = [];
-                        outRow.type = typeParam;
-                        //Second type parse is probably not needed, it's just
-                        //there incase begin ____ statements ever need a parameter
-                        //var secondTypeParse = outRow.type.match(type_regex);
-                        //if (secondTypeParse && secondTypeParse.length > 2) {
-                        //    outRow.type = secondTypeParse[1];
-                        //    outRow.param = secondTypeParse[2];
-                        //}
-                        outArrayStack.push(outRow);
-                    } else if (typeControl === "end_form") {
-                        if (outArrayStack.length <= 1) {
+        _.each(sheet, function(row){
+            var currStackIndex = outSheet.length-1;
+            var typeMatch, typeControl;
+            //parse the type
+            if('type' in row){
+                var outRow = row;
+                typeMatch = row.type.match(type_regex);
+                if(typeMatch && typeMatch.length > 0){
+                    typeControl = typeMatch[0];
+                    if(typeControl === "begin_form"){
+                        outSheet.push([outRow]);
+                    }else if(typeControl === "end_form"){
+                        if(outSheet.length < 1){
                             throw XLSXError(row.__rowNum__, "Unmatched end statement.");
                         }
-                        outArrayStack.pop();
-                        return;
-                    } else {
-                        outRow.type = typeControl;
-                        outRow.param = typeParam;
+                    }else{
+                        if(currStackIndex > -1){
+                            outRow.type = typeControl;
+                            outSheet[currStackIndex].push(outRow);   
+                        }
                     }
                 }
-            } else {
-                //Skip rows without types
-                return;
             }
-            curStack.push(outRow);
-            console.log(outRow);
-
         });
-        if (outArrayStack.length > 1) {
-            throw XLSXError(outArrayStack.pop().__rowNum__, "Unmatched begin statement.");
-        }
+        console.log(outSheet);
         return outSheet;
     };
 
@@ -266,7 +273,7 @@
                     }), true);
             }
 
-            wbJson['survey'] = parsePrompts(wbJson['survey']);
+            wbJson['survey'] = parseForms(wbJson['survey']);
 
             if ('choices' in wbJson) {
                 // lists is the sheet name. list_id is the column name on that sheet
@@ -286,7 +293,7 @@
             var extendedPTM = _.extend({}, promptTypeMap, userDefPrompts);
 
             // Converts the 'survey' sheet into custom format 
-            var generatedModel = generateModel(wbJson['survey'], extendedPTM);
+            var generatedModel = generateAlpaca(wbJson['survey'], extendedPTM);
             // var userDefModel;
             // if ("model" in wbJson) {
             //     userDefModel = _.groupBy(wbJson["model"], "name");
@@ -300,7 +307,7 @@
             wbJson['model'] = generatedModel;
             // }
 
-            return wbJson;
+            return wbJson['model'];
         },
         //Returns the warnings from the last workbook processed.
         getWarnings: function() {
