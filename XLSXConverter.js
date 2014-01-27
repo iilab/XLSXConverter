@@ -217,8 +217,24 @@
                                     var list = parsedLists[formItem.list_id];
                                     if(list != undefined){
                                         exception = true;
-                                        //create a new field for each checkbox
-                                        schemaObj.enum = list;
+                                        //create a new field for each item in the list
+                                        for(var j=0;j<list.length;j++){
+                                            var checkSchemaObj = {};
+                                            var checkOptionsObj = {};
+
+                                            //fill in individual options objects
+                                            if(j==0){
+                                                checkOptionsObj.label = optionsObj.label;
+                                            }
+                                            checkOptionsObj.type = "checkbox";
+                                            checkOptionsObj.rightLabel = list[j];
+
+                                            //fill in individual schema objects
+                                            checkSchemaObj.type = "string";
+
+                                            schema.properties[formItem.id+j] = checkSchemaObj;
+                                            options.fields[formItem.id+j] = checkOptionsObj
+                                        }
                                     }
                                 }
                             }
