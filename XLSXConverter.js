@@ -17,29 +17,29 @@
             "type": "string"
         },
         "multi_line_text": {
-            "type": "string"
+            "type": "textarea"
         },
         "number": {
-            "type": "string"
+            "type": "number"
         },
         "yes_no": {
-            "type": "string",
+            "type": "radio",
         },
         "yes_no_unknown": {
-            "type": "string",
+            "type": "radio",
         },
         "drop_down": {
             "type": "select"
         },
         "check_boxes": {
-            "type": "string"
+            "type": "checkbox"
         },
         "radio_buttons": {
-            "type": "string"
+            "type": "radio"
         },
 
         "date": {
-            "type": "string",
+            "type": "date",
         }
     };
     var warnings = {
@@ -132,7 +132,7 @@
     /*
     Generates a model for Alpaca.
     */
-    var generateAlpaca = function(formList, promptTypeMap) {
+    var generateAlpaca = function(formList, promptTypeMap, parsedLists) {
         var models = [];
         _.each(formList, function(form){
             //create a schema and options object for this form
@@ -140,6 +140,7 @@
             var options = {};
 
             var beginRow = form.shift();
+            var exception = false;
             //make sure that there is a begin_form marker at the top
             if(beginRow.type == "begin_form"){
                 //establish the schema basic items
@@ -155,6 +156,7 @@
                     schema.description = beginRow.en_help;
                 }
                 for(var i=0;i<form.length;i++){
+                    exception = false;
                     //grab single form item in form
                     var formItem = form[i];
                     var itemType = promptTypeMap[formItem.type];
@@ -163,9 +165,18 @@
                     var optionsObj = {};
                     //make sure the formItem has an id and legit type
                     if(formItem.id != undefined && itemType != undefined){
-
-                        optionsObj.label = formItem.en_labels
-                        optionsObj.helper = formItem.sw_labels;
+                        //add information where it needs to be, either
+                        // in the schema or the options
+                        optionsObj.label = formItem.en_labels;
+                        //see if there is a sw label as well
+                        if(/\S+/.test(formItem.sw_labels)){
+                            optionsObj.label += " ("+formItem.sw_labels+")";
+                        }
+                        //helper statements
+                        if(/\S+/.test(formItem.en_help)){
+                            optionsObj.helper = formItem.en_help;
+                            //TODO: add sw help
+                        }
                         schemaObj.type = "string";
                         if(formItem.constraint != undefined){
                             switch(formItem.constraint){
@@ -174,19 +185,66 @@
                                     break;
                             }
                         }
-                        if(itemType.type != "string"){
-                            // optionsObj.type = itemType.type;
+                        if(formItem.type != "single_line_text"){
+                            optionsObj.type = itemType.type;
+                            //special cases
+                            //number
+                            if(itemType.type == "number"){
+                                schemaObj.type = "number";
+                            }
+                            //yes no
+                            if(formItem.type == "yes_no"){
+                                schemaObj.enum = ["Yes", "No"];
+                            }
+                            //yes no unknown
+                            if(formItem.type == "yes_no_unknown"){
+                                schemaObj.enum = ["Yes","No","Unknown"];
+                            }
+                            // drop_down
+                            if(formItem.type == "drop_down"){
+                                //find out what list it is and grab it
+                                if(formItem.list_id != undefined){
+                                    var list = parsedLists[formItem.list_id];
+                                    if(list != undefined){
+                                        schemaObj.enum = list;
+                                    }
+                                }
+                            }
+                            // check_boxes
+                            if(formItem.type == "check_boxes"){
+                                //find out what list it is and grab it
+                                if(formItem.list_id != undefined){
+                                    var list = parsedLists[formItem.list_id];
+                                    if(list != undefined){
+                                        exception = true;
+                                        //create a new field for each checkbox
+                                        schemaObj.enum = list;
+                                    }
+                                }
+                            }
+                            // radio_buttons
+                            if(formItem.type == "radio_buttons"){
+                                //find out what list it is and grab it
+                                if(formItem.list_id != undefined){
+                                    var list = parsedLists[formItem.list_id];
+                                    if(list != undefined){
+                                        schemaObj.enum = list;
+                                    }
+                                }
+                            }
                         }
 
                         //add form items to schema and options
-                        schema.properties[formItem.id] = schemaObj;
-                        options.fields[formItem.id] = optionsObj
+                        if(!exception){
+                            schema.properties[formItem.id] = schemaObj;
+                            options.fields[formItem.id] = optionsObj
+                        }
 
                     }
                 }
             }
             var model = {"schema": schema, "options": options};
-            console.log(JSON.stringify(model));
+            //console.log(JSON.stringify(model));
             models.push(model);
         });
         return models;
@@ -220,8 +278,21 @@
                 }
             }
         });
-        console.log(outSheet);
+        //console.log(outSheet);
         return outSheet;
+    };
+
+    var parseLists = function(sheet){
+        var lists = {};
+        var item;
+        for(var i=0;i<sheet.length;i++){
+            item = sheet[i];
+            if(lists[item.list_id] == undefined){
+                lists[item.list_id] = [];
+            }
+            lists[item.list_id].push(item.en)
+        }
+        return lists;
     };
 
     //Remove carriage returns, trim values.
@@ -280,6 +351,9 @@
                 wbJson['lists'] = _.groupBy(wbJson['lists'], 'list_id');
             }
 
+            //Parse the lists and send them along to the generateAlpaca function
+            var parsedLists = parseLists(wbJson['lists']);
+
             //Generate a model:
             var userDefPrompts = {};
             // if ("prompt_types" in wbJson) {
@@ -293,7 +367,7 @@
             var extendedPTM = _.extend({}, promptTypeMap, userDefPrompts);
 
             // Converts the 'survey' sheet into custom format 
-            var generatedModel = generateAlpaca(wbJson['survey'], extendedPTM);
+            var generatedModel = generateAlpaca(wbJson['survey'], extendedPTM, parsedLists);
             // var userDefModel;
             // if ("model" in wbJson) {
             //     userDefModel = _.groupBy(wbJson["model"], "name");
