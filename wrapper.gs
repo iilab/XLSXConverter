@@ -40,19 +40,50 @@ function convert() {
     // var mypanel = myapp.createVerticalPanel();
     //  myapp.add(mypanel);
     try {
+        var file;
         var processedJSON = XLSXConverter.processJSONWorkbook(workbookToJson());
         _.each(XLSXConverter.getWarnings(), function(warning) {
             //TODO: Add option to parse the warnings and error strings,
             // and highlight the rows with errors.
             mypanel.add(myapp.createHTML("Warning: " + warning));
         });
-        var file = DocsList.createFile("formDef.json", JSON.stringify(processedJSON,
+        //create a file for all of the models
+        var models = processedJSON['model'];
+        if(models != undefined && models.length != undefined){
+            for(var i=0;i<models.length;i++){
+                var model = models[i];
+                var fileName = model.schema._id+".json";
+                var file = DocsList.createFile(fileName, JSON.stringify(model,
+                    function(key, value) {
+                        //Replacer function to leave out prototypes
+                        if (key !== "prototype") {
+                            return value;
+                        }
+                    }, 2));
+            }
+        }
+
+        var lists = processedJSON['lists'];
+        if(lists != undefined){
+            file = DocsList.createFile("lists.json", JSON.stringify(lists,
             function(key, value) {
                 //Replacer function to leave out prototypes
                 if (key !== "prototype") {
                     return value;
                 }
             }, 2));
+        }
+
+
+        //create a file containing everything as a record
+        file = DocsList.createFile("formDef.json", JSON.stringify(processedJSON,
+            function(key, value) {
+                //Replacer function to leave out prototypes
+                if (key !== "prototype") {
+                    return value;
+                }
+            }, 2));
+
         //mypanel.add(myapp.createAnchor("Download JSON", file.getUrl()));
     } catch (e) {
         //mypanel.add(myapp.createHTML("ERROR:"));

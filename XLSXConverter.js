@@ -132,7 +132,7 @@
     /*
     Generates a model for Alpaca.
     */
-    var generateAlpaca = function(formList, promptTypeMap, parsedLists) {
+    var generateAlpaca = function(formList, promptTypeMap, parsedLists, modelSettings) {
         var models = [];
         _.each(formList, function(form){
             //create a schema and options object for this form
@@ -147,6 +147,9 @@
                 schema.title = beginRow.en_labels;
                 schema._id = beginRow.id;
                 schema.type = "object";
+                /*Object.keys(modelSettings).map(function(key){
+                    schema[key] = modelSettings[key];
+                });*/
                 schema.properties = {};
 
                 //establish options basic items
@@ -260,7 +263,6 @@
                 }
             }
             var model = {"schema": schema, "options": options};
-            //console.log(JSON.stringify(model));
             models.push(model);
         });
         return models;
@@ -360,6 +362,8 @@
                     }), true);
             }
 
+
+
             wbJson['survey'] = parseForms(wbJson['survey']);
 
             if ('choices' in wbJson) {
@@ -382,8 +386,16 @@
             // }
             var extendedPTM = _.extend({}, promptTypeMap, userDefPrompts);
 
+            //create a settings object to pass to the generateAlpaca function
+            var modelSettings = {};
+            /*if('settings' in wbJson){
+                for(var i=0;i<wbJson['settings'].length;i++){
+                    modelSettings[wbJson['settings']['setting']] = wbJson['settings']['value'];
+                }
+            }*/
+
             // Converts the 'survey' sheet into custom format 
-            var generatedModel = generateAlpaca(wbJson['survey'], extendedPTM, parsedLists);
+            var generatedModel = generateAlpaca(wbJson['survey'], extendedPTM, parsedLists, modelSettings);
             // var userDefModel;
             // if ("model" in wbJson) {
             //     userDefModel = _.groupBy(wbJson["model"], "name");
@@ -397,7 +409,7 @@
             wbJson['model'] = generatedModel;
             // }
 
-            return wbJson['model'];
+            return wbJson;
         },
         //Returns the warnings from the last workbook processed.
         getWarnings: function() {
