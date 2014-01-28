@@ -137,7 +137,15 @@
         _.each(formList, function(form){
             //create a schema and options object for this form
             var schema = {};
-            var options = {};
+            var options = {
+                "renderForm": true,
+                "form": {
+                    "buttons": {
+                        "submit": {},
+                        "reset": {}
+                    }
+                }
+            };
 
             var beginRow = form.shift();
             var exception = false;
@@ -197,11 +205,13 @@
                             }
                             //yes no
                             if(formItem.type == "yes_no"){
-                                schemaObj.enum = ["Yes", "No"];
+                                schemaObj.enum = [true, false];
+                                optionsObj.enum = ["Yes", "No"];
                             }
                             //yes no unknown
                             if(formItem.type == "yes_no_unknown"){
-                                schemaObj.enum = ["Yes","No","Unknown"];
+                                schemaObj.enum = [true, false, "unknown"];
+                                optionsObj.enum = ["Yes", "No", "Unknown"];
                             }
                             // drop_down
                             if(formItem.type == "drop_down"){
@@ -231,6 +241,7 @@
                                             }
                                             checkOptionsObj.type = "checkbox";
                                             checkOptionsObj.rightLabel = list[j];
+                                            checkOptionsObj.name = formItem.id+"[]";
 
                                             //fill in individual schema objects
                                             checkSchemaObj.type = "string";
@@ -369,6 +380,14 @@
             if ('choices' in wbJson) {
                 // lists is the sheet name. list_id is the column name on that sheet
                 wbJson['lists'] = _.groupBy(wbJson['lists'], 'list_id');
+            }
+
+            //Remove empty values from the lists
+            for(var i=0;i<wbJson['lists'].length;i++){
+                if(!/\S+/.test(wbJson['lists'][i]['list_id'])){
+                    wbJson['lists'].splice(i,1);
+                    i--;
+                }
             }
 
             //Parse the lists and send them along to the generateAlpaca function

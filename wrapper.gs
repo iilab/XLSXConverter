@@ -1,4 +1,4 @@
-var appName = 'XLSXConverter';
+var appName = 'LTFHC Forms';
 
 /**
  * Transform the currently open workbook into json.
@@ -40,20 +40,50 @@ function convert() {
     // var mypanel = myapp.createVerticalPanel();
     //  myapp.add(mypanel);
     try {
-        var file;
         var processedJSON = XLSXConverter.processJSONWorkbook(workbookToJson());
         _.each(XLSXConverter.getWarnings(), function(warning) {
             //TODO: Add option to parse the warnings and error strings,
             // and highlight the rows with errors.
             mypanel.add(myapp.createHTML("Warning: " + warning));
         });
+
+        //open the correct folder and make sure it has the correct subdirectories
+        var folder = DocsList.getFolderById("0B-Xpyszhfc_oWWZoUEd4UmJXLUk");
+        var optionsFldr, schemaFldr, file;
+        var subDir = folder.getFolders();
+        for(var k=0;k<subDir.length;k++){
+            var fldr = subDir[k];
+            if(fldr.getName() == "schema"){
+                schemaFldr = fldr;
+            }
+            if(fldr.getName() == "options"){
+                optionsFldr = fldr;
+            }
+        }
+        if(schemaFldr == undefined){
+            schemaFldr = folder.createFolder("schema");
+        }
+        if(optionsFldr == undefined){
+            optionsFldr = folder.createFolder("options");
+        }
+
+        Logger.log(schemaFldr.getName());
+        Logger.log(optionsFldr.getName());
+
         //create a file for all of the models
         var models = processedJSON['model'];
         if(models != undefined && models.length != undefined){
             for(var i=0;i<models.length;i++){
                 var model = models[i];
                 var fileName = model.schema._id+".json";
-                var file = DocsList.createFile(fileName, JSON.stringify(model,
+                schemaFldr.createFile(fileName, JSON.stringify(model.schema,
+                    function(key, value) {
+                        //Replacer function to leave out prototypes
+                        if (key !== "prototype") {
+                            return value;
+                        }
+                    }, 2));
+                optionsFldr.createFile(fileName, JSON.stringify(model.options,
                     function(key, value) {
                         //Replacer function to leave out prototypes
                         if (key !== "prototype") {
@@ -65,7 +95,7 @@ function convert() {
 
         var lists = processedJSON['lists'];
         if(lists != undefined){
-            file = DocsList.createFile("lists.json", JSON.stringify(lists,
+            file = folder.createFile("lists.json", JSON.stringify(lists,
             function(key, value) {
                 //Replacer function to leave out prototypes
                 if (key !== "prototype") {
@@ -76,13 +106,15 @@ function convert() {
 
 
         //create a file containing everything as a record
-        file = DocsList.createFile("formDef.json", JSON.stringify(processedJSON,
+        file = folder.createFile("formDef.json", JSON.stringify(processedJSON,
             function(key, value) {
                 //Replacer function to leave out prototypes
                 if (key !== "prototype") {
                     return value;
                 }
             }, 2));
+
+        // file = folder.createFile("log", Logger.getLog());
 
         //mypanel.add(myapp.createAnchor("Download JSON", file.getUrl()));
     } catch (e) {
