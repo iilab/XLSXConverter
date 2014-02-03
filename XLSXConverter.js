@@ -186,7 +186,10 @@
                         //helper statements
                         if(/\S+/.test(formItem.en_help)){
                             optionsObj.helper = formItem.en_help;
-                            //TODO: add sw help
+                            //add sw help
+                            if(/\S+/.test(formItem.sw_help)){
+                                optionsObj.helper += " ("+formItem.sw_help+")";
+                            }
                         }
                         schemaObj.type = "string";
                         if(formItem.constraint != undefined){
@@ -205,12 +208,12 @@
                             }
                             //yes no
                             if(formItem.type == "yes_no"){
-                                schemaObj.enum = [true, false];
+                                schemaObj.enum = ["yes", "no"];
                                 optionsObj.enum = ["Yes", "No"];
                             }
                             //yes no unknown
                             if(formItem.type == "yes_no_unknown"){
-                                schemaObj.enum = [true, false, "unknown"];
+                                schemaObj.enum = ["yes", "no", "unknown"];
                                 optionsObj.enum = ["Yes", "No", "Unknown"];
                             }
                             // drop_down
