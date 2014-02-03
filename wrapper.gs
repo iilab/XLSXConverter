@@ -39,6 +39,15 @@ function convert() {
     //  var myapp = UiApp.createApplication().setTitle(appName);
     // var mypanel = myapp.createVerticalPanel();
     //  myapp.add(mypanel);
+
+    //function to remove old copies of a file in the folder.
+    var removeOldCopies = function(dir, fl){
+      //ERROR: for some reason gives error as 'getFilesByName is not a function of Folder Class'
+      /*var fileList = dir.getFilesByName(fl);
+      while(fileList.hasNext()){
+        fileList.next().setTrashed(true);
+      }*/
+    }
     try {
         var processedJSON = XLSXConverter.processJSONWorkbook(workbookToJson());
         _.each(XLSXConverter.getWarnings(), function(warning) {
@@ -76,6 +85,11 @@ function convert() {
             for(var i=0;i<models.length;i++){
                 var model = models[i];
                 var fileName = model.schema._id+".json";
+                //check for that filename in both folders and if it exists, remove it
+                removeOldCopies(schemaFldr, fileName);
+                removeOldCopies(optionsFldr, fileName);
+
+                //create the new files
                 schemaFldr.createFile(fileName, JSON.stringify(model.schema,
                     function(key, value) {
                         //Replacer function to leave out prototypes
@@ -93,6 +107,10 @@ function convert() {
             }
         }
 
+        //remove any existing copies of lists.json
+        removeOldCopies(folder, "lists.json")
+
+        //create the new copy of lists.json
         var lists = processedJSON['lists'];
         if(lists != undefined){
             file = folder.createFile("lists.json", JSON.stringify(lists,
@@ -104,6 +122,8 @@ function convert() {
             }, 2));
         }
 
+        //remove old copies of formDef.json
+        removeOldCopies(folder, "formDef.json");
 
         //create a file containing everything as a record
         file = folder.createFile("formDef.json", JSON.stringify(processedJSON,
@@ -148,7 +168,7 @@ function showInfoPopup(responseJson) {
 function onOpen() {
     var sheet = SpreadsheetApp.getActiveSpreadsheet();
     var entries = [{
-        name: "Convert",
+        name: "Generate",
         functionName: "convert"
     }, {
         name: "Settings",

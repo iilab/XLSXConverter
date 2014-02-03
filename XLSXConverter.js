@@ -132,7 +132,11 @@
     /*
     Generates a model for Alpaca.
     */
-    var generateAlpaca = function(formList, promptTypeMap, parsedLists, modelSettings) {
+    var generateAlpaca = function(formList, promptTypeMap, modelSettings) {
+        var generateListString = function(listName){
+            var ret = "lists/#"+listName;
+            return ret;
+        };
         var models = [];
         _.each(formList, function(form){
             //create a schema and options object for this form
@@ -210,59 +214,33 @@
                             if(formItem.type == "yes_no"){
                                 schemaObj.enum = ["yes", "no"];
                                 optionsObj.enum = ["Yes", "No"];
+                                optionsObj["removeDefaultNone"] = true;
                             }
                             //yes no unknown
                             if(formItem.type == "yes_no_unknown"){
                                 schemaObj.enum = ["yes", "no", "unknown"];
                                 optionsObj.enum = ["Yes", "No", "Unknown"];
+                                optionsObj["removeDefaultNone"] = true;
                             }
                             // drop_down
                             if(formItem.type == "drop_down"){
                                 //find out what list it is and grab it
                                 if(formItem.list_id != undefined){
-                                    var list = parsedLists[formItem.list_id];
-                                    if(list != undefined){
-                                        schemaObj.enum = list;
-                                    }
+                                    schemaObj["$ref"] = generateListString(formItem.list_id);
                                 }
                             }
                             // check_boxes
                             if(formItem.type == "check_boxes"){
                                 //find out what list it is and grab it
                                 if(formItem.list_id != undefined){
-                                    var list = parsedLists[formItem.list_id];
-                                    if(list != undefined){
-                                        exception = true;
-                                        //create a new field for each item in the list
-                                        for(var j=0;j<list.length;j++){
-                                            var checkSchemaObj = {};
-                                            var checkOptionsObj = {};
-
-                                            //fill in individual options objects
-                                            if(j==0){
-                                                checkOptionsObj.label = optionsObj.label;
-                                            }
-                                            checkOptionsObj.type = "checkbox";
-                                            checkOptionsObj.rightLabel = list[j];
-                                            checkOptionsObj.name = formItem.id+"[]";
-
-                                            //fill in individual schema objects
-                                            checkSchemaObj.type = "string";
-
-                                            schema.properties[formItem.id+j] = checkSchemaObj;
-                                            options.fields[formItem.id+j] = checkOptionsObj
-                                        }
-                                    }
+                                    schemaObj["$ref"] = generateListString(formItem.list_id);
                                 }
                             }
                             // radio_buttons
                             if(formItem.type == "radio_buttons"){
                                 //find out what list it is and grab it
                                 if(formItem.list_id != undefined){
-                                    var list = parsedLists[formItem.list_id];
-                                    if(list != undefined){
-                                        schemaObj.enum = list;
-                                    }
+                                    schemaObj["$ref"] = generateListString(formItem.list_id);
                                 }
                             }
                         }
@@ -314,7 +292,8 @@
         return outSheet;
     };
 
-    var parseLists = function(sheet){
+    //parse lists sheet into a map of list names to list contents
+    /*var parseLists = function(sheet){
         var lists = {};
         var item;
         for(var i=0;i<sheet.length;i++){
@@ -325,7 +304,7 @@
             lists[item.list_id].push(item.en)
         }
         return lists;
-    };
+    };*/
 
     //Remove carriage returns, trim values.
     var cleanValues = function(row) {
@@ -394,7 +373,7 @@
             }
 
             //Parse the lists and send them along to the generateAlpaca function
-            var parsedLists = parseLists(wbJson['lists']);
+            /*var parsedLists = parseLists(wbJson['lists']);*/
 
             //Generate a model:
             var userDefPrompts = {};
@@ -417,7 +396,7 @@
             }*/
 
             // Converts the 'survey' sheet into custom format 
-            var generatedModel = generateAlpaca(wbJson['survey'], extendedPTM, parsedLists, modelSettings);
+            var generatedModel = generateAlpaca(wbJson['survey'], extendedPTM, modelSettings);
             // var userDefModel;
             // if ("model" in wbJson) {
             //     userDefModel = _.groupBy(wbJson["model"], "name");
