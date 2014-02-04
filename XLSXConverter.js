@@ -140,8 +140,8 @@
         var models = [];
         _.each(formList, function(form){
             //create a schema and options object for this form
-            var schema = {};
-            var options = {
+            var schema = {"class": "schema"};
+            /*var options = {
                 "renderForm": true,
                 "form": {
                     "buttons": {
@@ -149,7 +149,8 @@
                         "reset": {}
                     }
                 }
-            };
+            };*/
+            var options = {};
 
             var beginRow = form.shift();
             var exception = false;
