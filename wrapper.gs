@@ -42,7 +42,7 @@ function convert() {
 
     //function to remove old copies of a file in the folder.
     var removeOldCopies = function(dir, fl){
-      //ERROR: for some reason gives error as 'getFilesByName is not a function of Folder Class'
+      //ERROR: for some reason gives error as 'getFilesByName is not a function of Folder Class' despite being in the API documentation
       /*var fileList = dir.getFilesByName(fl);
       while(fileList.hasNext()){
         fileList.next().setTrashed(true);
@@ -58,8 +58,10 @@ function convert() {
 
         //open the correct folder and make sure it has the correct subdirectories
         var folder = DocsList.getFolderById("0B-Xpyszhfc_oWWZoUEd4UmJXLUk");
+        var now = new Date().toJSON().replace(/:/g,".");
+        folder = folder.createFolder("forms_"+now);
         var optionsFldr, schemaFldr, file;
-        var subDir = folder.getFolders();
+        /*var subDir = folder.getFolders();
         for(var k=0;k<subDir.length;k++){
             var fldr = subDir[k];
             if(fldr.getName() == "schema"){
@@ -69,12 +71,12 @@ function convert() {
                 optionsFldr = fldr;
             }
         }
-        if(schemaFldr == undefined){
+        if(schemaFldr == undefined){*/
             schemaFldr = folder.createFolder("schema");
-        }
-        if(optionsFldr == undefined){
+        //}
+        //if(optionsFldr == undefined){
             optionsFldr = folder.createFolder("options");
-        }
+        //}
 
         Logger.log(schemaFldr.getName());
         Logger.log(optionsFldr.getName());
