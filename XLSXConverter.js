@@ -237,7 +237,7 @@
                                 if(formItem.list_id != undefined){
                                     schemaObj["$ref"] = generateListString(formItem.list_id);
                                 }
-                                optionsObj["removeDefaultNone"] = true;
+                                // optionsObj["removeDefaultNone"] = true;
                             }
                             // radio_buttons
                             if(formItem.type == "radio_buttons"){
