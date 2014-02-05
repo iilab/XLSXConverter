@@ -229,6 +229,7 @@
                                 if(formItem.list_id != undefined){
                                     schemaObj["$ref"] = generateListString(formItem.list_id);
                                 }
+                                optionsObj["removeDefaultNone"] = true;
                             }
                             // check_boxes
                             if(formItem.type == "check_boxes"){
@@ -236,6 +237,7 @@
                                 if(formItem.list_id != undefined){
                                     schemaObj["$ref"] = generateListString(formItem.list_id);
                                 }
+                                optionsObj["removeDefaultNone"] = true;
                             }
                             // radio_buttons
                             if(formItem.type == "radio_buttons"){
@@ -243,6 +245,7 @@
                                 if(formItem.list_id != undefined){
                                     schemaObj["$ref"] = generateListString(formItem.list_id);
                                 }
+                                optionsObj["removeDefaultNone"] = true;
                             }
                         }
 
